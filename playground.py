@@ -18,6 +18,8 @@ y = op.Sum(op.Exp(x))
 
 g = op.Gradient(x)
 
-print op.run([g, y], {x: np.array([1, 2, 3])})
+op.run(y, {x: np.array([1.0, 2.0, 3.0])})
 
-print optimizers.numeric_gradient(np.array([1,2,3]), lambda inp: op.run(y, {x: inp}))
+print op.run(g)
+
+print optimizers.numeric_gradient(np.array([1.0, 2.0, 3.0]), lambda inp: op.run(y, {x: inp}))

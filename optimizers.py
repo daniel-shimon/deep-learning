@@ -3,16 +3,16 @@ import math
 import numpy as np
 
 
-def numeric_gradient(params, f):
-    params = np.asarray(params)
-    d_params = np.zeros_like(params)
-    fx = f(params)
-    for i in xrange(params.shape[0]):
-        like_params = np.copy(params)
-        dx = 1e-9
-        like_params[i, ] += dx
+def numeric_gradient(x, f):
+    x = np.asarray(x)
+    d_params = np.zeros_like(x)
+    fx = f(x)
+    for i in xrange(x.shape[0]):
+        like_x = np.copy(x)
+        dx = like_x[i, ] * 1e-8
+        like_x[i, ] += dx
 
-        derivative = (f(like_params) - fx) / dx
+        derivative = (f(like_x) - fx) / dx
         if np.shape(derivative) == ():
             d_params[i, ] = derivative
         else:

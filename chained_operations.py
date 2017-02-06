@@ -1,7 +1,8 @@
 import numpy as np
 
 
-def run(return_values, feed_dict):
+def run(return_values, feed_dict=None):
+    feed_dict = feed_dict or {}
     for operation, value in feed_dict.items():
         operation.run(value)
 
@@ -9,15 +10,19 @@ def run(return_values, feed_dict):
         ret = []
         for operation in return_values:
             ret.append(operation.output)
+            operation.backwards()
         return tuple(ret)
     elif isinstance(return_values, dict):
         ret = {}
         for key, operation in return_values.items():
             ret[key] = operation.output
+            operation.backwards()
         return ret
 
     operation = return_values
-    return operation.output
+    ret = operation.output
+    operation.backwards()
+    return ret
 
 
 class ChainedOperation(object):
@@ -90,7 +95,7 @@ class Variable(ChainedOperation):
         return self.value
 
     def calc_backwards(self):
-        return 1
+        return np.ones_like(self.value, dtype=np.float64)
 
     def run(self, value):
         self.value = value
@@ -99,13 +104,18 @@ class Variable(ChainedOperation):
 
 class Gradient(ChainedOperation):
     def __init__(self, operation):
-        super(Gradient, self).__init__([operation])
+        super(Gradient, self).__init__([])
+        operation.input_objects.append(self)
 
     def calc_forwards(self, inputs):
-        return self.input_objects[0].grad
+        return 1
 
     def calc_backwards(self):
         return 1
+
+    def backwards(self, output_object=None):
+        super(Gradient, self).backwards(output_object)
+        self.output = self.grad
 
 
 class Sum(ChainedOperation):
