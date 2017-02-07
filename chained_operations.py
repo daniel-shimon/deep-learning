@@ -47,7 +47,7 @@ class ChainedOperation(object):
         self.inputs_ready[input_object] = True
 
         if self.all_inputs_ready():
-            self.inputs = [i.output for i in self.input_objects]
+            self.inputs = [i.get_output() for i in self.input_objects]
             self.output = self.calc_forwards(self.inputs)
 
             for o in self.output_objects:
@@ -63,6 +63,9 @@ class ChainedOperation(object):
         if self.all_outputs_ready():
             for input_object in self.input_objects:
                 input_object.backwards(self)
+
+    def get_output(self):
+        return self.output
 
     def get_grad(self, input_object):
         return self.grad * self.calc_backwards(input_object)
@@ -151,4 +154,4 @@ class Mul(ChainedOperation):
     def calc_backwards(self, input_object):
         for i in self.input_objects:
             if i != input_object:
-                return i.output
+                return i.get_output()
