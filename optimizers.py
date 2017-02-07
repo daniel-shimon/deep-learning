@@ -7,7 +7,7 @@ def numeric_gradient(x, f):
     x = np.asarray(x)
     d_params = np.zeros_like(x)
     fx = f(x)
-    for i in xrange(x.shape[0]):
+    for i in range(x.shape[0]):
         like_x = np.copy(x)
         dx = like_x[i, ] * 1e-8
         like_x[i, ] += dx

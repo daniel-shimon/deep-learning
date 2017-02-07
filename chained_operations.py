@@ -36,8 +36,9 @@ class ChainedOperation(object):
         self.grad = 0
 
         for i in self.input_objects:
-            self.inputs_ready[i] = False
-            i.add_output(self)
+            if isinstance(i, ChainedOperation):
+                self.inputs_ready[i] = False
+                i.add_output(self)
 
     def add_output(self, output_object):
         self.output_objects.append(output_object)
@@ -47,7 +48,12 @@ class ChainedOperation(object):
         self.inputs_ready[input_object] = True
 
         if self.all_inputs_ready():
-            self.inputs = [i.get_output() for i in self.input_objects]
+            self.inputs = []
+            for i in self.input_objects:
+                if isinstance(i, ChainedOperation):
+                    self.inputs.append(i.get_output())
+                else:
+                    self.inputs.append(i)
             self.output = self.calc_forwards(self.inputs)
 
             for o in self.output_objects:
@@ -62,7 +68,8 @@ class ChainedOperation(object):
 
         if self.all_outputs_ready():
             for input_object in self.input_objects:
-                input_object.backwards(self)
+                if isinstance(input_object, ChainedOperation):
+                    input_object.backwards(self)
 
     def get_output(self):
         return self.output
@@ -71,7 +78,7 @@ class ChainedOperation(object):
         return self.grad * self.calc_backwards(input_object)
 
     def all_inputs_ready(self):
-        for state in self.inputs_ready.items():
+        for state in self.inputs_ready.values():
             if state is False:
                 return False
         return True
@@ -89,10 +96,10 @@ class ChainedOperation(object):
         raise NotImplementedError('Abstract class')
 
 
-class Variable(ChainedOperation):
+class Placeholder(ChainedOperation):
 
     def __init__(self):
-        super(Variable, self).__init__()
+        super(Placeholder, self).__init__()
         self.value = None
 
     def calc_forwards(self, _):
@@ -149,9 +156,12 @@ class Mul(ChainedOperation):
         super(Mul, self).__init__([a, b])
 
     def calc_forwards(self, inputs):
-        return np.multiply(inputs[0], inputs[2])
+        return np.multiply(inputs[0], inputs[1])
 
     def calc_backwards(self, input_object):
         for i in self.input_objects:
             if i != input_object:
-                return i.get_output()
+                if isinstance(i, ChainedOperation):
+                    return i.get_output()
+
+                return i

@@ -2,24 +2,18 @@ import chained_operations as op
 import optimizers
 import numpy as np
 
+a = op.Placeholder()
+b = op.Placeholder()
 
-def check_operation(forwards, backwards):
-    x = np.array([0.1, 0.3])
-    forwards(x)
-    grad = backwards()
-    n_grad = optimizers.numeric_gradient(x, forwards)
-    print (grad, n_grad)
+g_a = op.Gradient(a)
+g_b = op.Gradient(b)
 
-y_ = np.array([1, 0])
+y = op.Mul(-1, b)
 
-x = op.Variable()
+data = np.array([1.0, 2.0, 3.0])
 
-y = op.Sum(op.Exp(x))
+out, grad_a, grad_b = op.run([y, g_a, g_b], {a: 2, b: 3})
 
-g = op.Gradient(x)
+print(grad_a, grad_b)
 
-op.run(y, {x: np.array([1.0, 2.0, 3.0])})
-
-print op.run(g)
-
-print optimizers.numeric_gradient(np.array([1.0, 2.0, 3.0]), lambda inp: op.run(y, {x: inp}))
+# print(optimizers.numeric_gradient(data, lambda inp: op.run(y, {x: inp})))
