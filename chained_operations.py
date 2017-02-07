@@ -184,6 +184,22 @@ class Mul(ChainedOperation):
                 return i
 
 
+class Dot(ChainedOperation):
+    def __init__(self, a, b):
+        super(Dot, self).__init__([a, b])
+
+    def calc_forwards(self, inputs):
+        return np.dot(inputs[0], inputs[1])
+
+    def calc_backwards(self, input_object):
+        for i in self.input_objects:
+            if i is not input_object:
+                if isinstance(i, ChainedOperation):
+                    return i.get_output()
+
+                return i
+
+
 class Reciprocal(SingleInputChainedOperation):
     def calc_forwards_single(self, x):
         return 1 / x

@@ -10,15 +10,16 @@ x = op.Placeholder()
 g = op.Gradient(x)
 
 y = op.Mul(-1, op.Log(op.Mul(op.Sum(op.Mul(y_, op.Exp(x))), op.Reciprocal(op.Sum(op.Exp(x))))))
+y2 = op.Mul(-1, op.Log(op.Mul(op.Dot(y_, op.Exp(x)), op.Reciprocal(op.Sum(op.Exp(x))))))
 #y = op.Sum(op.Mul(-3, x))
 
 
 def f(inp):
-    return op.run(y, {x: inp})
+    return op.run(y2, {x: inp})
 
 
 def grad(inp, _):
-    op.run(y, {x: inp})
+    op.run(y2, {x: inp})
     return op.run(g)
 
 data1 = np.random.rand(*y_.shape)
