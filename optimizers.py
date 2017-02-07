@@ -4,7 +4,7 @@ import numpy as np
 
 
 def numeric_gradient(x, f):
-    x = np.asarray(x)
+    x = np.asarray(x, np.float64)
     d_params = np.zeros_like(x)
     fx = f(x)
     for i in range(x.shape[0]):
@@ -34,7 +34,7 @@ class SGD(BaseOptimizer):
 
     def optimize(self, params):
         d_params = self.gradient_func(params, self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             params[i] -= self.learning_rate * d_params[i]
 
 
@@ -68,7 +68,7 @@ class NEG(BaseOptimizer):
     def optimize(self, params):
         d_params = self.gradient_func([param - self.momentum_strength*self.last_v for param in params],
                                       self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             v = self.momentum_strength*self.last_v + self.learning_rate*d_params[i]
             params[i] -= v
             self.last_v = v

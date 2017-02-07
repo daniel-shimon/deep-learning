@@ -20,7 +20,7 @@ def run(return_values, feed_dict=None):
         return ret
 
     operation = return_values
-    ret = operation.output
+    ret = operation.get_output()
     operation.backwards()
     return ret
 
@@ -59,6 +59,11 @@ class ChainedOperation(object):
             for o in self.output_objects:
                 o.forwards(self)
 
+            # Clear backwards variables
+            self.grad = 0
+            for key in self.outputs_ready.keys():
+                self.outputs_ready[key] = False
+
     def backwards(self, output_object=None):
         if output_object is None:
             self.grad = 1
@@ -96,6 +101,23 @@ class ChainedOperation(object):
         raise NotImplementedError('Abstract class')
 
 
+class SingleInputChainedOperation(ChainedOperation):
+    def __init__(self, x):
+        super(SingleInputChainedOperation, self).__init__([x])
+
+    def calc_forwards(self, inputs):
+        return self.calc_forwards_single(inputs[0])
+
+    def calc_backwards(self, input_object):
+        return self.calc_backwards_single(self.inputs[0])
+
+    def calc_forwards_single(self, x):
+        raise NotImplementedError('Abstract class')
+
+    def calc_backwards_single(self, x):
+        raise NotImplementedError('Abstract class')
+
+
 class Placeholder(ChainedOperation):
 
     def __init__(self):
@@ -109,7 +131,7 @@ class Placeholder(ChainedOperation):
         return np.ones_like(self.value, dtype=np.float64)
 
     def run(self, value):
-        self.value = value
+        self.value = np.asarray(value)
         self.forwards(self)
 
 
@@ -125,30 +147,25 @@ class Gradient(ChainedOperation):
         return 1
 
     def backwards(self, output_object=None):
+        self.grad = 0
         super(Gradient, self).backwards(output_object)
         self.output = self.grad
 
 
-class Sum(ChainedOperation):
-    def __init__(self, x):
-        super(Sum, self).__init__([x])
+class Log(SingleInputChainedOperation):
+    def calc_forwards_single(self, x):
+        return np.log(x)
 
-    def calc_forwards(self, inputs):
-        return np.sum(inputs[0])
+    def calc_backwards_single(self, x):
+        return 1 / x
 
-    def calc_backwards(self, _):
+
+class Sum(SingleInputChainedOperation):
+    def calc_forwards_single(self, x):
+        return np.sum(x)
+
+    def calc_backwards_single(self, x):
         return 1
-
-
-class Exp(ChainedOperation):
-    def __init__(self, x):
-        super(Exp, self).__init__([x])
-
-    def calc_forwards(self, inputs):
-        return np.exp(inputs[0])
-
-    def calc_backwards(self, _):
-        return np.exp(self.inputs[0])
 
 
 class Mul(ChainedOperation):
@@ -160,8 +177,30 @@ class Mul(ChainedOperation):
 
     def calc_backwards(self, input_object):
         for i in self.input_objects:
-            if i != input_object:
+            if i is not input_object:
                 if isinstance(i, ChainedOperation):
                     return i.get_output()
 
                 return i
+
+
+class Reciprocal(SingleInputChainedOperation):
+    def calc_forwards_single(self, x):
+        return 1 / x
+
+    def calc_backwards_single(self, x):
+        return - 1 / np.square(x)
+
+
+class Exp(SingleInputChainedOperation):
+    def calc_forwards_single(self, x):
+        if hasattr(x, 'max'):
+            return np.exp(x - x.max())
+
+        return np.exp(x)
+
+    def calc_backwards_single(self, x):
+        if hasattr(x, 'max'):
+            return np.exp(x - x.max())
+
+        return np.exp(x)
