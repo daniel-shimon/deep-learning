@@ -58,13 +58,14 @@ class ChainedOperation(object):
             self.grad = 1
         else:
             self.outputs_ready[output_object] = True
-            self.grad += output_object.grad
+            self.grad += output_object.get_grad(self)
 
         if self.all_outputs_ready():
-            self.grad *= self.calc_backwards()
-
             for input_object in self.input_objects:
                 input_object.backwards(self)
+
+    def get_grad(self, input_object):
+        return self.grad * self.calc_backwards(input_object)
 
     def all_inputs_ready(self):
         for state in self.inputs_ready.items():
@@ -81,7 +82,7 @@ class ChainedOperation(object):
     def calc_forwards(self, inputs):
         raise NotImplementedError('Abstract class')
 
-    def calc_backwards(self):
+    def calc_backwards(self, input_object):
         raise NotImplementedError('Abstract class')
 
 
@@ -94,7 +95,7 @@ class Variable(ChainedOperation):
     def calc_forwards(self, _):
         return self.value
 
-    def calc_backwards(self):
+    def calc_backwards(self, _):
         return np.ones_like(self.value, dtype=np.float64)
 
     def run(self, value):
@@ -110,7 +111,7 @@ class Gradient(ChainedOperation):
     def calc_forwards(self, inputs):
         return 1
 
-    def calc_backwards(self):
+    def calc_backwards(self, _):
         return 1
 
     def backwards(self, output_object=None):
@@ -125,7 +126,7 @@ class Sum(ChainedOperation):
     def calc_forwards(self, inputs):
         return np.sum(inputs[0])
 
-    def calc_backwards(self):
+    def calc_backwards(self, _):
         return 1
 
 
@@ -136,5 +137,18 @@ class Exp(ChainedOperation):
     def calc_forwards(self, inputs):
         return np.exp(inputs[0])
 
-    def calc_backwards(self):
+    def calc_backwards(self, _):
         return np.exp(self.inputs[0])
+
+
+class Mul(ChainedOperation):
+    def __init__(self, a, b):
+        super(Mul, self).__init__([a, b])
+
+    def calc_forwards(self, inputs):
+        return np.multiply(inputs[0], inputs[2])
+
+    def calc_backwards(self, input_object):
+        for i in self.input_objects:
+            if i != input_object:
+                return i.output
