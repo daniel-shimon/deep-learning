@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def run(return_values, feed_dict=None):
+def run(return_values, feed_dict=None, backwards=True):
     feed_dict = feed_dict or {}
     for operation, value in feed_dict.items():
         operation.run(value)
@@ -10,18 +10,21 @@ def run(return_values, feed_dict=None):
         ret = []
         for operation in return_values:
             ret.append(operation.output)
-            operation.backwards()
+            if backwards:
+                operation.backwards()
         return tuple(ret)
     elif isinstance(return_values, dict):
         ret = {}
         for key, operation in return_values.items():
             ret[key] = operation.output
-            operation.backwards()
+            if backwards:
+                operation.backwards()
         return ret
 
     operation = return_values
     ret = operation.get_output()
-    operation.backwards()
+    if backwards:
+        operation.backwards()
     return ret
 
 
@@ -31,7 +34,7 @@ class ChainedOperation(object):
         self.output_objects = []
         self.inputs_ready = {}
         self.outputs_ready = {}
-        self.inputs = None
+        self.inputs = []
         self.output = None
         self.grad = 0
 
@@ -48,7 +51,7 @@ class ChainedOperation(object):
         self.inputs_ready[input_object] = True
 
         if self.all_inputs_ready():
-            self.inputs = []
+            self.inputs.clear()
             for i in self.input_objects:
                 if isinstance(i, ChainedOperation):
                     self.inputs.append(i.get_output())
@@ -59,14 +62,19 @@ class ChainedOperation(object):
             for o in self.output_objects:
                 o.forwards(self)
 
-            # Clear backwards variables
+            # Clear variables
             self.grad = 0
             for key in self.outputs_ready.keys():
                 self.outputs_ready[key] = False
+            for key in self.inputs_ready.keys():
+                self.inputs_ready[key] = False
 
     def backwards(self, output_object=None):
+        if len(self.inputs) != len(self.input_objects):
+            raise ValueError('cannot preform backwards pass before full forwards pass')
+
         if output_object is None:
-            self.grad = 1
+            self.grad = np.ones_like(self.output)
         else:
             self.outputs_ready[output_object] = True
             self.grad += output_object.get_grad(self)
@@ -83,14 +91,15 @@ class ChainedOperation(object):
         return self.grad * self.calc_backwards(input_object)
 
     def all_inputs_ready(self):
-        for state in self.inputs_ready.values():
-            if state is False:
-                return False
-        return True
+        return self.all_ready(self.inputs_ready)
 
     def all_outputs_ready(self):
-        for o in self.outputs_ready.items():
-            if o is False:
+        return self.all_ready(self.outputs_ready)
+
+    @staticmethod
+    def all_ready(l):
+        for state in l.values():
+            if state is False:
                 return False
         return True
 
@@ -101,9 +110,9 @@ class ChainedOperation(object):
         raise NotImplementedError('Abstract class')
 
 
-class SingleInputChainedOperation(ChainedOperation):
+class UnaryChainedOperation(ChainedOperation):
     def __init__(self, x):
-        super(SingleInputChainedOperation, self).__init__([x])
+        super(UnaryChainedOperation, self).__init__([x])
 
     def calc_forwards(self, inputs):
         return self.calc_forwards_single(inputs[0])
@@ -118,6 +127,23 @@ class SingleInputChainedOperation(ChainedOperation):
         raise NotImplementedError('Abstract class')
 
 
+class BinaryChainedOperation(ChainedOperation):
+    def __init__(self, a, b):
+        super(BinaryChainedOperation, self).__init__([a, b])
+
+    def calc_forwards(self, inputs):
+        return self.calc_forwards_dual(inputs[0], inputs[1])
+
+    def calc_backwards(self, input_object):
+        return self.calc_backwards_dual(input_object, self.inputs[0], self.inputs[1])
+
+    def calc_forwards_dual(self, a, b):
+        raise NotImplementedError('Abstract class')
+
+    def calc_backwards_dual(self, input_object, a, b):
+        raise NotImplementedError('Abstract class')
+
+
 class Placeholder(ChainedOperation):
 
     def __init__(self):
@@ -128,10 +154,10 @@ class Placeholder(ChainedOperation):
         return self.value
 
     def calc_backwards(self, _):
-        return np.ones_like(self.value, dtype=np.float64)
+        return 1
 
     def run(self, value):
-        self.value = np.asarray(value)
+        self.value = np.asmatrix(value)
         self.forwards(self)
 
 
@@ -152,7 +178,7 @@ class Gradient(ChainedOperation):
         self.output = self.grad
 
 
-class Log(SingleInputChainedOperation):
+class Log(UnaryChainedOperation):
     def calc_forwards_single(self, x):
         return np.log(x)
 
@@ -160,47 +186,38 @@ class Log(SingleInputChainedOperation):
         return 1 / x
 
 
-class Sum(SingleInputChainedOperation):
+class Sum(UnaryChainedOperation):
     def calc_forwards_single(self, x):
         return np.sum(x)
 
     def calc_backwards_single(self, x):
-        return 1
+        return np.ones_like(x)
 
 
-class Mul(ChainedOperation):
-    def __init__(self, a, b):
-        super(Mul, self).__init__([a, b])
+class Mul(BinaryChainedOperation):
+    def calc_forwards_dual(self, a, b):
+        return np.multiply(a, b)
 
-    def calc_forwards(self, inputs):
-        return np.multiply(inputs[0], inputs[1])
-
-    def calc_backwards(self, input_object):
-        for i in self.input_objects:
-            if i is not input_object:
-                if isinstance(i, ChainedOperation):
-                    return i.get_output()
-
-                return i
+    def calc_backwards_dual(self, input_object, a, b):
+        if self.input_objects.index(input_object) == 0:
+            return b
+        return a
 
 
-class Dot(ChainedOperation):
-    def __init__(self, a, b):
-        super(Dot, self).__init__([a, b])
+class Dot(BinaryChainedOperation):
+    def get_grad(self, input_object):
+        if self.input_objects.index(input_object) == 0:
+            return np.dot(self.grad, np.transpose(self.inputs[1]))
+        return np.dot(np.transpose(self.inputs[0]), self.grad)
 
-    def calc_forwards(self, inputs):
-        return np.dot(inputs[0], inputs[1])
+    def calc_forwards_dual(self, a, b):
+        return np.dot(a, b)
 
-    def calc_backwards(self, input_object):
-        for i in self.input_objects:
-            if i is not input_object:
-                if isinstance(i, ChainedOperation):
-                    return i.get_output()
-
-                return i
+    def calc_backwards_dual(self, input_object, a, b):
+        pass
 
 
-class Reciprocal(SingleInputChainedOperation):
+class Reciprocal(UnaryChainedOperation):
     def calc_forwards_single(self, x):
         return 1 / x
 
@@ -208,7 +225,7 @@ class Reciprocal(SingleInputChainedOperation):
         return - 1 / np.square(x)
 
 
-class Exp(SingleInputChainedOperation):
+class Exp(UnaryChainedOperation):
     def calc_forwards_single(self, x):
         if hasattr(x, 'max'):
             return np.exp(x - x.max())

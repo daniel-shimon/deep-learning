@@ -4,20 +4,35 @@ import numpy as np
 
 
 def numeric_gradient(x, f):
-    x = np.asarray(x, np.float64)
-    d_params = np.zeros_like(x)
+    x = np.asmatrix(x, np.float64)
+    d_x = np.zeros_like(x)
     fx = f(x)
-    for i in range(x.shape[0]):
+    r = [None]
+    if np.shape(fx) != () and np.shape(fx) != np.shape(d_x):
+        for rank in range(len(np.shape(fx))):
+            if np.shape(fx)[rank] != np.shape(d_x)[rank]:
+                r[0] = rank
+                break
+
+    it = np.nditer(d_x, flags=['multi_index'])
+    while not it.finished:
         like_x = np.copy(x)
-        dx = like_x[i, ] * 1e-8
-        like_x[i, ] += dx
+        dx = like_x[it.multi_index] * 1e-8
+        like_x[it.multi_index] += dx
 
         derivative = (f(like_x) - fx) / dx
         if np.shape(derivative) == ():
-            d_params[i, ] = derivative
-        else:
-            d_params[i, ] = derivative[i, ]
-    return d_params
+            d_x[it.multi_index] = derivative
+        elif np.shape(derivative) == np.shape(d_x):
+            d_x[it.multi_index] = derivative[it.multi_index]
+        elif r[0] is not None:
+            for i in range(np.shape(derivative)[r[0]]):
+                location = list(it.multi_index)
+                location[r[0]] = i
+                d_x[it.multi_index] += derivative[tuple(location)]
+
+        it.iternext()
+    return d_x
 
 
 class BaseOptimizer(object):
