@@ -2,6 +2,7 @@ import numpy as np
 import itertools as it
 
 import chained_operations as op
+import neural_nets as nn
 import data_utils
 import plotting
 from optimizers import numeric_gradient
@@ -18,7 +19,7 @@ g = op.Gradient(w)
 y = op.Dot(x, w)
 
 y_ = op.Placeholder()
-loss = op.Mul(-1, op.Log(op.Mul(op.Sum(op.Mul(y_, op.Exp(y, axis=1)), axis=1), op.Reciprocal(op.Sum(op.Exp(y, axis=1), axis=1)))))
+loss = nn.Softmax(y, y_)
 
 batch_size = 10
 w_values = np.random.rand(1024 * 3, 10)

@@ -132,15 +132,15 @@ class BinaryChainedOperation(ChainedOperation):
         super(BinaryChainedOperation, self).__init__([a, b])
 
     def calc_forwards(self, inputs):
-        return self.calc_forwards_dual(inputs[0], inputs[1])
+        return self.calc_forwards_binary(inputs[0], inputs[1])
 
     def calc_backwards(self, input_object):
-        return self.calc_backwards_dual(input_object, self.inputs[0], self.inputs[1])
+        return self.calc_backwards_binary(input_object, self.inputs[0], self.inputs[1])
 
-    def calc_forwards_dual(self, a, b):
+    def calc_forwards_binary(self, a, b):
         raise NotImplementedError('Abstract class')
 
-    def calc_backwards_dual(self, input_object, a, b):
+    def calc_backwards_binary(self, input_object, a, b):
         raise NotImplementedError('Abstract class')
 
 
@@ -232,10 +232,10 @@ class Exp(UnaryChainedOperation):
 
 
 class Mul(BinaryChainedOperation):
-    def calc_forwards_dual(self, a, b):
+    def calc_forwards_binary(self, a, b):
         return np.multiply(a, b)
 
-    def calc_backwards_dual(self, input_object, a, b):
+    def calc_backwards_binary(self, input_object, a, b):
         if self.input_objects.index(input_object) == 0:
             return b
         return a
@@ -247,8 +247,8 @@ class Dot(BinaryChainedOperation):
             return np.dot(self.grad, np.transpose(self.inputs[1]))
         return np.dot(np.transpose(self.inputs[0]), self.grad)
 
-    def calc_forwards_dual(self, a, b):
+    def calc_forwards_binary(self, a, b):
         return np.dot(a, b)
 
-    def calc_backwards_dual(self, input_object, a, b):
+    def calc_backwards_binary(self, input_object, a, b):
         pass
