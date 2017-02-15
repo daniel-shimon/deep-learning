@@ -14,7 +14,7 @@ def replot():
         args, kwargs = graph.get_plot_args()
         plt.plot(*args, **kwargs)
     plt.legend()
-    plt.pause(0.05)
+    plt.pause(0.01)
 
 
 class Graph(object):

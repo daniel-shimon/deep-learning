@@ -88,7 +88,7 @@ class ChainedOperation(object):
         return self.output
 
     def get_grad(self, input_object):
-        return self.grad * self.calc_backwards(input_object)
+        return np.multiply(self.grad, self.calc_backwards(input_object))
 
     def all_inputs_ready(self):
         return self.all_ready(self.inputs_ready)
@@ -187,11 +187,48 @@ class Log(UnaryChainedOperation):
 
 
 class Sum(UnaryChainedOperation):
+    def __init__(self, x, axis=None):
+        super(Sum, self).__init__(x)
+        self.axis = axis
+
     def calc_forwards_single(self, x):
-        return np.sum(x)
+        return np.sum(x, self.axis)
+
+    def get_grad(self, input_object):
+        if self.axis is not None:
+            reps = np.ones_like(np.shape(self.inputs[0]))
+            reps[self.axis] = np.shape(self.inputs[0])[self.axis]
+            return np.tile(self.grad, reps)
+        return super(Sum, self).get_grad(input_object)
 
     def calc_backwards_single(self, x):
         return np.ones_like(x)
+
+
+class Reciprocal(UnaryChainedOperation):
+    def calc_forwards_single(self, x):
+        return 1 / x
+
+    def calc_backwards_single(self, x):
+        return - 1 / np.square(x)
+
+
+class Exp(UnaryChainedOperation):
+    def __init__(self, x, axis=None):
+        super(Exp, self).__init__(x)
+        self.axis = axis
+
+    def calc_forwards_single(self, x):
+        if self.axis is not None:
+            return np.exp(x - np.max(x, axis=self.axis))
+
+        return np.exp(x)
+
+    def calc_backwards_single(self, x):
+        if self.axis is not None:
+            return np.exp(x - np.max(x, axis=self.axis))
+
+        return np.exp(x)
 
 
 class Mul(BinaryChainedOperation):
@@ -215,25 +252,3 @@ class Dot(BinaryChainedOperation):
 
     def calc_backwards_dual(self, input_object, a, b):
         pass
-
-
-class Reciprocal(UnaryChainedOperation):
-    def calc_forwards_single(self, x):
-        return 1 / x
-
-    def calc_backwards_single(self, x):
-        return - 1 / np.square(x)
-
-
-class Exp(UnaryChainedOperation):
-    def calc_forwards_single(self, x):
-        if hasattr(x, 'max'):
-            return np.exp(x - x.max())
-
-        return np.exp(x)
-
-    def calc_backwards_single(self, x):
-        if hasattr(x, 'max'):
-            return np.exp(x - x.max())
-
-        return np.exp(x)

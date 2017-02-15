@@ -23,14 +23,26 @@ class Cifar10(object):
         return label_names
 
     @staticmethod
-    def get_batch(n):
+    def get_batch(n, raw=False):
         path = os.path.join('cifar-10-batches-py', 'data_batch_%d' % n)
         with open(path, 'rb') as f:
             dictionary = c_pickle.load(f, encoding='bytes')
-        return dictionary
+        if not raw:
+            dictionary[b'data'] = dictionary[b'data'].astype(np.float64)
+            dictionary[b'data'] /= 255
+            dictionary[b'data'] -= 0.5
+            labels = np.zeros((len(dictionary[b'labels']), 10))
+            for i in range(len(dictionary[b'labels'])):
+                labels[i, dictionary[b'labels'][i]] = 1
+            dictionary[b'labels'] = labels
+        return dictionary[b'data'], dictionary[b'labels']
 
     @staticmethod
-    def show_img_array(flat):
+    def show_img_array(flat, normalized=True):
+        if normalized:
+            flat += 0.5
+            flat *= 255
+
         img_array = np.zeros((32, 32, 3))
         for channel in range(3):
             for row in range(32):
