@@ -1,4 +1,8 @@
-import copy
+"""
+Naive optimizers with numeric gradient
+"""
+
+
 import math
 import numpy as np
 
@@ -38,7 +42,7 @@ def numeric_gradient(x, f):
 class BaseOptimizer(object):
     # noinspection PyMethodMayBeStatic
     def optimize(self, params):
-        yield NotImplementedError('Abstract class')
+        yield NotImplementedError()
 
 
 class SGD(BaseOptimizer):
@@ -63,7 +67,7 @@ class Momentum(BaseOptimizer):
 
     def optimize(self, params):
         d_params = self.gradient_func(params, self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             v = self.momentum_strength*self.last_v + self.learning_rate*d_params[i]
             params[i] -= v
             self.last_v = v
@@ -98,10 +102,10 @@ class Adagrad(BaseOptimizer):
 
     def optimize(self, params):
         if not len(self.G) == len(params):
-            self.G = [0 for _ in xrange(len(params))]
+            self.G = [0 for _ in range(len(params))]
         d_params = self.gradient_func(params,
                                       self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             g = d_params[i]
             self.G[i] += g ** 2
             params[i] -= (self.learning_rate / math.sqrt(self.G[i] + 1e-8)) * g
@@ -117,13 +121,13 @@ class Adadelta(BaseOptimizer):
 
     def optimize(self, params):
         if not len(self.decaying_g) == len(params):
-            self.decaying_g = [0 for _ in xrange(len(params))]
+            self.decaying_g = [0 for _ in range(len(params))]
         if not len(self.decaying_d) == len(params):
-            self.decaying_d = [0 for _ in xrange(len(params))]
+            self.decaying_d = [0 for _ in range(len(params))]
 
         d_params = self.gradient_func(params,
                                       self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             g = d_params[i]
             self.decay_update(self.decaying_g, i, g)
             d = -(math.sqrt(self.decaying_d[i] + 1e-8) / math.sqrt(self.decaying_g[i] + 1e-8)) * g
@@ -144,11 +148,11 @@ class RMSProp(BaseOptimizer):
 
     def optimize(self, params):
         if not len(self.decaying_g) == len(params):
-            self.decaying_g = [0 for _ in xrange(len(params))]
+            self.decaying_g = [0 for _ in range(len(params))]
 
         d_params = self.gradient_func(params,
                                       self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             g = d_params[i]
             self.decay_update(self.decaying_g, i, g)
             d = -(self.learning_rate / math.sqrt(self.decaying_g[i] + 1e-8)) * g
@@ -170,13 +174,13 @@ class Adam(BaseOptimizer):
 
     def optimize(self, params):
         if not len(self.decaying_v) == len(params):
-            self.decaying_v = [0 for _ in xrange(len(params))]
+            self.decaying_v = [0 for _ in range(len(params))]
         if not len(self.decaying_m) == len(params):
-            self.decaying_m = [0 for _ in xrange(len(params))]
+            self.decaying_m = [0 for _ in range(len(params))]
 
         d_params = self.gradient_func(params,
                                       self.function)
-        for i in xrange(len(params)):
+        for i in range(len(params)):
             self.decay_updates(i, d_params[i])
             m_hat = self.decaying_m[i] / (1 - self.decay1)
             v_hat = self.decaying_v[i] / (1 - self.decay2)

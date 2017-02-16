@@ -9,14 +9,14 @@ def run(return_values, feed_dict=None, backwards=True):
     if isinstance(return_values, (list, tuple)):
         ret = []
         for operation in return_values:
-            ret.append(operation.output)
+            ret.append(operation.get_output())
             if backwards:
                 operation.backwards()
         return tuple(ret)
     elif isinstance(return_values, dict):
         ret = {}
         for key, operation in return_values.items():
-            ret[key] = operation.output
+            ret[key] = operation.get_output()
             if backwards:
                 operation.backwards()
         return ret
@@ -39,7 +39,7 @@ class ChainedOperation(object):
         self.grad = 0
 
         for i in self.input_objects:
-            if isinstance(i, ChainedOperation):
+            if isinstance(i, ChainedOperation) and not isinstance(i, Variable):
                 self.inputs_ready[i] = False
                 i.add_output(self)
 
@@ -87,7 +87,9 @@ class ChainedOperation(object):
     def get_output(self):
         return self.output
 
-    def get_grad(self, input_object):
+    def get_grad(self, input_object=None):
+        if input_object is None:
+            return self.grad
         return np.multiply(self.grad, self.calc_backwards(input_object))
 
     def all_inputs_ready(self):
@@ -161,21 +163,24 @@ class Placeholder(ChainedOperation):
         self.forwards(self)
 
 
-class Gradient(ChainedOperation):
-    def __init__(self, operation):
-        super(Gradient, self).__init__([])
-        operation.input_objects.append(self)
+class Variable(Placeholder):
+    def __init__(self, shape, random_func=np.random.rand):
+        super(Variable, self).__init__()
+        self.shape = shape
+        self.random_func = random_func
+        self.initialize()
 
-    def calc_forwards(self, inputs):
-        return 1
+    def get_output(self):
+        return self.value
 
-    def calc_backwards(self, _):
-        return 1
+    def update(self, delta, direction=1):
+        self.value += direction * delta
 
-    def backwards(self, output_object=None):
+    def initialize(self):
+        self.value = self.random_func(*self.shape)
+
+    def reset_grad(self):
         self.grad = 0
-        super(Gradient, self).backwards(output_object)
-        self.output = self.grad
 
 
 class Log(UnaryChainedOperation):
