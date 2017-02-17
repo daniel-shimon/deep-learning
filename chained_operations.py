@@ -47,10 +47,13 @@ class ChainedOperation(object):
         self.output_objects.append(output_object)
         self.outputs_ready[output_object] = False
 
-    def forwards(self, input_object):
-        self.inputs_ready[input_object] = True
+    def forwards(self, input_object=None):
+        self_forward = input_object is None
+        if not self_forward:
+            self.inputs_ready[input_object] = True
 
-        if self.all_inputs_ready():
+        inputs_ready = self.all_inputs_ready()
+        if inputs_ready and not self_forward:
             self.inputs.clear()
             for i in self.input_objects:
                 if isinstance(i, ChainedOperation):
@@ -59,6 +62,7 @@ class ChainedOperation(object):
                     self.inputs.append(i)
             self.output = self.calc_forwards(self.inputs)
 
+        if inputs_ready or self_forward:
             for o in self.output_objects:
                 o.forwards(self)
 
@@ -74,7 +78,8 @@ class ChainedOperation(object):
             raise ValueError('cannot preform backwards pass before full forwards pass')
 
         if output_object is None:
-            self.grad = np.ones_like(self.output)
+            if not np.any(self.grad):
+                self.grad = np.ones_like(self.output)
         else:
             self.outputs_ready[output_object] = True
             self.grad += output_object.get_grad(self)
@@ -150,17 +155,16 @@ class Placeholder(ChainedOperation):
 
     def __init__(self):
         super(Placeholder, self).__init__()
-        self.value = None
 
     def calc_forwards(self, _):
-        return self.value
+        return 1
 
     def calc_backwards(self, _):
         return 1
 
     def run(self, value):
-        self.value = np.asmatrix(value)
-        self.forwards(self)
+        self.output = np.asmatrix(value)
+        self.forwards()
 
 
 class Variable(Placeholder):
@@ -168,6 +172,7 @@ class Variable(Placeholder):
         super(Variable, self).__init__()
         self.shape = shape
         self.random_func = random_func
+        self.value = None
         self.initialize()
 
     def get_output(self):
@@ -247,13 +252,17 @@ class Mul(BinaryChainedOperation):
 
 
 class Dot(BinaryChainedOperation):
-    def get_grad(self, input_object):
+    def get_grad(self, input_object=None):
+        if input_object is None:
+            return self.grad
         if self.input_objects.index(input_object) == 0:
-            return np.dot(self.grad, np.transpose(self.inputs[1]))
-        return np.dot(np.transpose(self.inputs[0]), self.grad)
+            return np.dot(self.grad, self.calc_backwards(input_object))
+        return np.dot(self.calc_backwards(input_object), self.grad)
 
     def calc_forwards_binary(self, a, b):
         return np.dot(a, b)
 
     def calc_backwards_binary(self, input_object, a, b):
-        pass
+        if self.input_objects.index(input_object) == 0:
+            return np.transpose(b)
+        return np.transpose(a)

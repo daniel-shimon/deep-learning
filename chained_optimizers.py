@@ -1,5 +1,5 @@
-import numpy as np
 import chained_operations as op
+import neural_layers as nn
 
 
 class ChainedOptimizer(object):
@@ -31,7 +31,10 @@ class ChainedOptimizer(object):
         if isinstance(chained_operation, op.ChainedOperation):
             if isinstance(chained_operation, op.Variable):
                 return [chained_operation]
+
             variables = []
+            if isinstance(chained_operation, nn.Layer):
+                variables.extend(chained_operation.get_variables())
             for input_object in chained_operation.input_objects:
                 variables.extend(ChainedOptimizer.find_variables(input_object))
             return variables
@@ -44,5 +47,4 @@ class SGD(ChainedOptimizer):
         self.learning_rate = learning_rate
 
     def update(self, variable, gradient):
-        variable.value -= gradient * 0.01
-        #variable.update(self.learning_rate * gradient, direction=self.direction)
+        variable.update(self.learning_rate * gradient, direction=self.direction)

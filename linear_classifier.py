@@ -2,7 +2,7 @@ import numpy as np
 import itertools as it
 
 import chained_operations as op
-import neural_nets as nn
+import neural_layers as nn
 import data_utils
 import plotting
 import chained_optimizers as optimizers
@@ -11,11 +11,9 @@ label_names = data_utils.Cifar10.load_labels()
 
 data, labels = data_utils.Cifar10.get_batch(1, raw=False)
 
-x = op.Placeholder()
+x = nn.InputLayer(1024 * 3)
 
-w = op.Variable((1024 * 3, 10))
-
-y = op.Dot(x, w)
+y = nn.Dense(x, 10)
 
 y_ = op.Placeholder()
 loss = nn.Softmax(y, y_)
