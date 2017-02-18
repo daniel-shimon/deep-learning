@@ -40,6 +40,9 @@ class Layer(op.ChainedOperation):
         index = self.input_objects.index(input_object)
         return self.firsts[index].grad
 
+    def calc_backwards(self, input_object):
+        pass
+
     def get_variables(self):
         return self.variables
 
@@ -127,7 +130,9 @@ class Dense(UnaryLayer):
         if self.input_shapes[0] is None:
             raise ValueError('input has no defined shape')
         w = op.Variable((self.input_shapes[0], self.neurons))
-        return op.Dot(x, w), w
+        b = op.Variable((1, self.neurons))
+        y = op.Add(op.Dot(x, w), b, axis=0)
+        return y, [w, b]
 
     def get_unary_len(self, shape):
         return self.neurons

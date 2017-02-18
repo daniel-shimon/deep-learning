@@ -241,6 +241,28 @@ class Exp(UnaryChainedOperation):
         return np.exp(x)
 
 
+class Add(BinaryChainedOperation):
+    def __init__(self, a, b, axis=0):
+        super(Add, self).__init__(a, b)
+        self.axis = axis
+
+    def calc_forwards_binary(self, a, b):
+        return np.add(a, b)
+
+    def get_grad(self, input_object=None):
+        if input_object is None:
+            return self.grad
+        grad = np.multiply(self.grad, self.calc_backwards(input_object))
+        if np.shape(grad) != np.shape(self.inputs[self.input_objects.index(input_object)]):
+            grad = np.sum(grad, self.axis)
+        return grad
+
+    def calc_backwards_binary(self, input_object, a, b):
+        if self.input_objects.index(input_object) == 0:
+            return np.ones_like(a)
+        return np.ones_like(b)
+
+
 class Mul(BinaryChainedOperation):
     def calc_forwards_binary(self, a, b):
         return np.multiply(a, b)
