@@ -20,7 +20,7 @@ loss = nn.Softmax(y, y_)
 
 batch_size = 10
 
-optimizer = optimizers.SGD(loss)
+optimizer = optimizers.Adagrad(loss)
 graph = plotting.Graph('loss')
 
 for count, mini_batch_x, mini_batch_y_ in zip(
