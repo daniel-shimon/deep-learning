@@ -39,14 +39,14 @@ class Cifar10(object):
 
     @staticmethod
     def show_img_array(flat, normalized=True):
-        if normalized:
-            flat += 0.5
-            flat *= 255
-
         img_array = np.zeros((32, 32, 3))
         for channel in range(3):
             for row in range(32):
                 for collum in range(32):
                     img_array[row, collum, channel] = flat[channel * 1024 + row * 32 + collum]
+        if normalized:
+            img_array -= img_array.min()
+            img_array /= img_array.max()
+            img_array *= 255
         with Image.fromarray(img_array.astype(np.uint8)) as img:
             img.show()

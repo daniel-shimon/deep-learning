@@ -9,23 +9,34 @@ def run(return_values, feed_dict=None, backwards=True):
     if isinstance(return_values, (list, tuple)):
         ret = []
         for operation in return_values:
-            ret.append(operation.get_output())
+            if isinstance(operation, ChainedOperation):
+                output = operation.get_output()
+            else:
+                output = operation
+            ret.append(output)
             if backwards:
                 operation.backwards()
         return tuple(ret)
     elif isinstance(return_values, dict):
         ret = {}
         for key, operation in return_values.items():
-            ret[key] = operation.get_output()
+            if isinstance(operation, ChainedOperation):
+                output = operation.get_output()
+            else:
+                output = operation
+            ret[key] = output
             if backwards:
                 operation.backwards()
         return ret
 
     operation = return_values
-    ret = operation.get_output()
+    if isinstance(operation, ChainedOperation):
+        output = operation.get_output()
+    else:
+        output = operation
     if backwards:
         operation.backwards()
-    return ret
+    return output
 
 
 class ChainedOperation(object):
@@ -39,8 +50,9 @@ class ChainedOperation(object):
         self.grad = 0
 
         for i in self.input_objects:
-            if isinstance(i, ChainedOperation) and not isinstance(i, Variable):
-                self.inputs_ready[i] = False
+            if isinstance(i, ChainedOperation):
+                if not isinstance(i, Variable):
+                    self.inputs_ready[i] = False
                 i.add_output(self)
 
     def add_output(self, output_object):
@@ -75,7 +87,8 @@ class ChainedOperation(object):
 
     def backwards(self, output_object=None):
         if len(self.inputs) != len(self.input_objects):
-            raise ValueError('cannot preform backwards pass before full forwards pass')
+            raise ValueError('cannot preform backwards pass before full forwards pass,'
+                             'have you missed placeholder values in the feed_dict?')
 
         if output_object is None:
             if not np.any(self.grad):
@@ -167,8 +180,12 @@ class Placeholder(ChainedOperation):
         self.forwards()
 
 
+def random_weight(*args):
+    return (np.random.rand(*args) - 0.5) * 2
+
+
 class Variable(Placeholder):
-    def __init__(self, shape, random_func=np.random.rand):
+    def __init__(self, shape, random_func=random_weight):
         super(Variable, self).__init__()
         self.shape = shape
         self.random_func = random_func

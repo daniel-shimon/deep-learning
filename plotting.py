@@ -47,6 +47,11 @@ class Graph(object):
     def get_plot_args(self):
         return (self.xs, self.ys), {'label': self.label}
 
+    def clear(self, plot=False):
+        self.xs.clear()
+        self.ys.clear()
+        self.maybe_plot(plot)
+
     @staticmethod
     def maybe_plot(plot):
         if plot:

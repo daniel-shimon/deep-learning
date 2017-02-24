@@ -8,12 +8,16 @@ class ChainedOptimizer(object):
         self.loss = loss
         self.direction = -1 if minimize else 1
 
+        self.variable_layers = []
         self.variables = self.find_variables(loss)
         if not self.variables:
             raise ValueError('no variables found to optimize')
 
-    def step(self, feed_dict):
+    def step(self, feed_dict=None):
+        feed_dict = feed_dict or {}
         self.reset_grads()
+        for layer in self.variable_layers:
+            layer.forwards()
         loss = op.run(self.loss, feed_dict)
 
         for variable in self.variables:
@@ -27,9 +31,10 @@ class ChainedOptimizer(object):
     def update(self, variable, gradient):
         raise NotImplementedError()
 
-    @staticmethod
-    def find_variables(chained_operation):
+    def find_variables(self, chained_operation):
         if isinstance(chained_operation, op.ChainedOperation):
+            if isinstance(chained_operation, nn.VariableLayer):
+                self.variable_layers.append(chained_operation)
             if isinstance(chained_operation, op.Variable):
                 return [chained_operation]
 
@@ -37,7 +42,7 @@ class ChainedOptimizer(object):
             if isinstance(chained_operation, nn.Layer):
                 variables.extend(chained_operation.get_variables())
             for input_object in chained_operation.input_objects:
-                variables.extend(ChainedOptimizer.find_variables(input_object))
+                variables.extend(self.find_variables(input_object))
             return variables
         return []
 

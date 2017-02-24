@@ -7,9 +7,13 @@ import data_utils
 import plotting
 import chained_optimizers as optimizers
 
+print('get data')
+
 label_names = data_utils.Cifar10.load_labels()
 
 data, labels = data_utils.Cifar10.get_batch(1, raw=False)
+
+print('build model')
 
 x = nn.InputLayer(1024 * 3)
 
@@ -18,10 +22,12 @@ y = nn.Dense(x, 10)
 y_ = op.Placeholder()
 loss = nn.Softmax(y, y_)
 
-batch_size = 10
+print('train model')
 
-optimizer = optimizers.Adagrad(loss)
+batch_size = 100
+
 graph = plotting.Graph('loss')
+optimizer = optimizers.Adagrad(loss)
 
 for count, mini_batch_x, mini_batch_y_ in zip(
         it.count(),
@@ -33,3 +39,28 @@ for count, mini_batch_x, mini_batch_y_ in zip(
 
     print('%d loss - %f' % (count, batch_loss))
     graph.maybe_add(count, count, batch_loss, True)
+
+    if batch_loss < 4:
+        break
+
+
+print('deep dream')
+
+images = nn.VariableLayer(1, 1024 * 3)
+y.set_inputs(images)
+y.lock()
+
+y.set_inputs(x)
+
+truths = np.zeros((1, 10))
+truths[0][1] = 1
+
+graph.clear()
+optimizer = optimizers.Adagrad(loss)
+
+for i in range(15):
+    loss = np.mean(optimizer.step({y_: truths}))
+    print('%d loss - %f' % (i, loss))
+    graph.maybe_add(i, i, loss, plot=True)
+
+print('done')

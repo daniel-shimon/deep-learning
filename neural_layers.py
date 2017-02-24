@@ -7,6 +7,7 @@ class Layer(op.ChainedOperation):
     def __init__(self, inputs=None):
         inputs = inputs or []
         super(Layer, self).__init__(inputs)
+        self.is_locked = False
 
         self.firsts = [op.Placeholder() for _ in inputs]
         self.input_shapes = []
@@ -25,7 +26,8 @@ class Layer(op.ChainedOperation):
         if self.last is not None:
             if output_object is not None:
                 self.last.grad = output_object.get_grad(self)
-            self.last.backwards()
+            if self.last != self:
+                self.last.backwards()
         super(Layer, self).backwards(output_object)
 
     def calc_forwards(self, inputs):
@@ -44,7 +46,28 @@ class Layer(op.ChainedOperation):
         pass
 
     def get_variables(self):
+        if self.is_locked:
+            return []
         return self.variables
+
+    def lock(self):
+        self.is_locked = True
+
+    def unlock(self):
+        self.is_locked = False
+
+    def set_inputs(self, new_inputs=None):
+        new_inputs = new_inputs or []
+        if not len(new_inputs) == len(self.input_objects):
+            raise ValueError('cannot change inputs number')
+
+        self.input_objects = new_inputs or []
+        self.inputs_ready = {}
+        for i in self.input_objects:
+            if isinstance(i, op.ChainedOperation):
+                if not isinstance(i, op.Variable):
+                    self.inputs_ready[i] = False
+                i.add_output(self)
 
     def get_output_len(self):
         raise NotImplementedError()
@@ -72,6 +95,18 @@ class InputLayer(op.Placeholder, Layer):
         super(InputLayer, self).run(value)
 
 
+class VariableLayer(op.Variable, Layer):
+    def __init__(self, depth=0, size=0):
+        self.size = size
+        super(VariableLayer, self).__init__((depth, size))
+
+    def get_output_len(self):
+        return self.size
+
+    def build_layer(self, inputs):
+        return self, self
+
+
 class UnaryLayer(Layer):
     def __init__(self, x):
         super(UnaryLayer, self).__init__([x])
@@ -87,6 +122,9 @@ class UnaryLayer(Layer):
 
     def get_unary_len(self, shape):
         raise NotImplementedError()
+
+    def set_inputs(self, new_input=None):
+        super(UnaryLayer, self).set_inputs([new_input])
 
 
 class BinaryLayer(Layer):
